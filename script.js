@@ -1,86 +1,109 @@
-const booksDisplay = document.querySelector(".books-display");
-const myLibrary = [];
-
-
-function saveLibrary(){
-  localStorage.setItem("myLibrary", JSON.stringify(myLibrary));
-}
-
-function loadLibrary() {
-  const storedLibrary = localStorage.getItem("myLibrary");
-  if (storedLibrary) {
-    const parsed = JSON.parse(storedLibrary);
-    myLibrary.length = 0; 
-    parsed.forEach(book => {
-      myLibrary.push(new Book(book.title, book.author, book.pages, book.hasRead));
-    });
-  }
-  else {
-      myLibrary.push(new Book("O Hobbit", "J.R.R. Tolkien", 295, false));
-      myLibrary.push(new Book("1984", "George Orwell", 328, true));
-  }
-}
-function Book(title, author, pages, read) {
-  if(!new.target){
-    throw Error("must use 'new'");
-  }
+class Book {
+  constructor(title, author, pages, read = false) {
+    this.id = crypto.randomUUID();
     this.title = title;
     this.author = author;
     this.pages = pages;
     this.read = read;
+  }
 
-    this.info = function () {
-      return `${this.title}, ${this.author}, ${this.pages} pages, `+
-      (this.read ? "Já foi lido" : "Ainda não foi lido");
+  toggleRead() {
+    this.read = !this.read;
+  }
+
+  info() {
+    return `${this.title}, ${this.author}, ${this.pages} páginas, ` +
+           (this.read ? "Já foi lido" : "Ainda não foi lido");
+  }
+}
+
+class Library {
+  constructor() {
+    this.books = [];
+    this.load();
+  }
+
+  addBook(book) {
+    this.books.push(book);
+    this.save();
+  }
+
+  removeBook(id) {
+    this.books = this.books.filter(book => book.id !== id);
+    this.save();
+  }
+
+  toggleReadStatus(id) {
+    const book = this.books.find(book => book.id === id);
+    if (book) {
+      book.toggleRead();
+      this.save();
     }
+  }
+
+  save() {
+    localStorage.setItem("myLibrary", JSON.stringify(this.books));
+  }
+
+  load() {
+    const stored = JSON.parse(localStorage.getItem("myLibrary"));
+    if (stored) {
+      this.books = stored.map(b => Object.assign(new Book(), b));
+    } else {
+      // Default books
+      this.books = [
+        new Book("O Hobbit", "J.R.R. Tolkien", 295, false),
+        new Book("1984", "George Orwell", 328, true)
+      ];
+    }
+  }
 }
 
-function addBookToLibrary(title, author, pages, hasRead) {
-  const newBook = new Book(title, author, pages, hasRead);
-  myLibrary.push(newBook);
-  saveLibrary();
-  displayBooks(myLibrary);
-}
-function removeBook(index){
-  myLibrary.splice(index, 1);
-  saveLibrary();
-  displayBooks(myLibrary);
-}
 
-function displayBooks(Library) {
+function displayBooks(library) {
   const container = document.getElementById("book-container");
   container.innerHTML = "";
 
-  Library.forEach((book, index) =>{
+  library.books.forEach(book => {
     const bookDiv = document.createElement("div");
     bookDiv.classList.add("book");
 
-    const bookInfo = document.createElement("p");
-    bookInfo.textContent = book.info();
+    const info = document.createElement("p");
+    info.textContent = book.info();
 
     const removeBtn = document.createElement("button");
-    removeBtn.textContent = "Remover"
+    removeBtn.textContent = "Remover";
     removeBtn.addEventListener("click", () => {
-      removeBook(index);
+      library.removeBook(book.id);
+      displayBooks(library);
     });
 
-    bookDiv.appendChild(bookInfo);
-    bookDiv.appendChild(removeBtn);
+    const toggleBtn = document.createElement("button");
+    toggleBtn.textContent = book.read ? "Marcar como não lido" : "Marcar como lido";
+    toggleBtn.addEventListener("click", () => {
+      library.toggleReadStatus(book.id);
+      displayBooks(library);
+    });
+
+    bookDiv.append(info, toggleBtn, removeBtn);
     container.appendChild(bookDiv);
-  })
+  });
 }
 
-loadLibrary();
-displayBooks(myLibrary);
 
-document.getElementById("book-form").addEventListener("submit", function(e) {
+document.getElementById("book-form").addEventListener("submit", function (e) {
   e.preventDefault();
 
   const title = document.getElementById("title").value;
   const author = document.getElementById("author").value;
   const pages = parseInt(document.getElementById("pages").value);
-  const hasRead = document.getElementById("hasRead").checked;
+  const read = document.getElementById("hasRead").checked;
 
-  addBookToLibrary(title, author, pages, hasRead);
+  library.addBook(new Book(title, author, pages, read));
+  displayBooks(library);
   this.reset();
 });
+
+
+const library = new Library();
+displayBooks(library);
